@@ -7,6 +7,7 @@ License:	LGPL
 Group:		Libraries
 Source0:	http://libspf2.org/spf/%{name}-%{version}.tar.gz
 # Source0-md5:	5fe69ba13bf35d505b733247032a8a64
+Patch0:		%{name}-link.patch
 BuildRequires:	autoconf >= 2.59
 BuildRequires:	automake
 BuildRequires:	libtool
@@ -48,6 +49,7 @@ Statyczna biblioteka libspf2.
 
 %prep
 %setup -q
+%patch0 -p1
 
 %build
 %{__libtoolize}
