@@ -2,7 +2,7 @@ Summary:	Implementation of the SPF specification
 Summary(pl):	Implementacja specyfikacji SPF
 Name:		libspf2
 Version:	1.0.4
-Release:	2
+Release:	3
 License:	LGPL
 Group:		Libraries
 Source0:	http://libspf2.org/spf/%{name}-%{version}.tar.gz
@@ -22,6 +22,20 @@ http://www.ietf.org/internet-drafts/draft-mengwong-spf-01.txt .
 Libspf2 jest implementacj± specyfikacji SPF, która znajduje siê pod
 adresem
 http://www.ietf.org/internet-drafts/draft-mengwong-spf-01.txt .
+
+%package tools
+Summary:	Tools distributed with libspf2
+Summary(pl):	Programy narzêdziowe, dystrybuowane z libspf2
+Group:		Networking/Utilities
+Requires:	%{name} = %{version}-%{release}
+
+%description tools
+Tools distributed with libspf2; at the time of writing: spf_example,
+spf_example_2mx, spfd, spfquery and spftest.
+
+%description tools -l pl
+Programy narzêdziowe, dystrybuowane z libspf2; w momencie pisania tego
+opisu: spf_example, spf_example_2mx, spfd, spfquery i spftest.
 
 %package devel
 Summary:	Header files for libspf2 library
@@ -78,12 +92,11 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(644,root,root,755)
 %doc README TODO LICENSES INSTALL Changelog docs/API docs/draft-mengwong-spf-00.txt
-%attr(755,root,root) %{_bindir}/spf_example
-%attr(755,root,root) %{_bindir}/spf_example_2mx
-%attr(755,root,root) %{_bindir}/spfd
-%attr(755,root,root) %{_bindir}/spfquery
-%attr(755,root,root) %{_bindir}/spftest
 %attr(755,root,root) %{_libdir}/lib*.so.*.*.*
+
+%files tools
+%defattr(644,root,root,755)
+%attr(755,root,root) %{_bindir}/*
 
 %files devel
 %defattr(644,root,root,755)
