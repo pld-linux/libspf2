@@ -1,0 +1,23 @@
+diff -urN libspf2-1.0.4.org/configure.ac libspf2-1.0.4/configure.ac
+--- libspf2-1.0.4.org/configure.ac	2004-07-28 22:42:48.515708512 +0200
++++ libspf2-1.0.4/configure.ac	2004-07-28 22:56:08.559083432 +0200
+@@ -94,14 +94,14 @@
+                 [AC_CHECK_LIB([resolv],
+                         [res_query],
+                         [LIBS="$LIBS -lresolv"],
+-                        [echo "cannot find resolver library"; exit 1;])
++			[AC_CHECK_LIB([resolv],[__res_query],[LIBS="$LIBS -lresolv"],[echo "cannot find resolver library"; exit 1;])])
+                 ])
+-        ], [AC_CHECK_LIB(resolv, res_query)])
++        ], [AC_CHECK_LIB(resolv, res_query,[LIBS="$LIBS -lresolv"],[AC_CHECK_LIB(resolv, __res_query)])])
+ 
+ # Checks for libraries.
+-AC_CHECK_LIB(nsl, inet_pton)
+-AC_CHECK_LIB(socket, socket)
+-AC_CHECK_LIB(intl, gettext)
++AC_SEARCH_LIBS(nsl, inet_pton)
++AC_SEARCH_LIBS(socket, socket)
++AC_SEARCH_LIBS(intl, gettext)
+ 
+ 
+ 
