@@ -15,12 +15,12 @@ BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
 %description
 Libspf2 is an implementation of the SPF specification as found at
-http://www.ietf.org/internet-drafts/draft-mengwong-spf-00.txt .
+http://www.ietf.org/internet-drafts/draft-mengwong-spf-01.txt .
 
 %description -l pl
 Libspf2 jest implementacj± specyfikacji SPF, która znajduje siê pod
 adresem
-http://www.ietf.org/internet-drafts/draft-mengwong-spf-00.txt .
+http://www.ietf.org/internet-drafts/draft-mengwong-spf-01.txt .
 
 %package devel
 Summary:	Header files for libspf2 library
