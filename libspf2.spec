@@ -2,7 +2,7 @@ Summary:	Implementation of the SPF specification
 Summary(pl):	Implementacja specyfikacji SPF
 Name:		libspf2
 Version:	1.0.4
-Release:	1
+Release:	2
 License:	LGPL
 Group:		Libraries
 Source0:	http://libspf2.org/spf/%{name}-%{version}.tar.gz
@@ -11,7 +11,7 @@ Patch0:		%{name}-link.patch
 BuildRequires:	autoconf >= 2.59
 BuildRequires:	automake
 BuildRequires:	libtool
-#Obsoletes:	libspf_alt
+Obsoletes:	libspf_alt
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
 %description
@@ -28,6 +28,7 @@ Summary:	Header files for libspf2 library
 Summary(pl):	Pliki nag³ówkowe biblioteki libspf2
 Group:		Development/Libraries
 Requires:	%{name} = %{version}-%{release}
+Obsoletes:	libspf_alt-devel
 
 %description devel
 Header files for libspf2 library.
@@ -40,6 +41,7 @@ Summary:	Static libspf2 library
 Summary(pl):	Statyczna biblioteka libspf2
 Group:		Development/Libraries
 Requires:	%{name}-devel = %{version}-%{release}
+Obsoletes:	libspf_alt-static
 
 %description static
 Static libspf2 library.
