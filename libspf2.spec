@@ -8,6 +8,7 @@ Group:		Libraries
 Source0:	http://libspf2.org/spf/%{name}-%{version}.tar.gz
 # Source0-md5:	5fe69ba13bf35d505b733247032a8a64
 Patch0:		%{name}-link.patch
+Patch1:		%{name}-ac.patch
 BuildRequires:	autoconf >= 2.59
 BuildRequires:	automake
 BuildRequires:	libtool
@@ -66,14 +67,15 @@ Statyczna biblioteka libspf2.
 %prep
 %setup -q
 %patch0 -p1
+%patch1 -p1
 
 %build
+cp -f /usr/share/automake/config.{guess,sub} .
 %{__libtoolize}
 %{__aclocal}
 %{__autoconf}
 %{__autoheader}
 %{__automake} 
-cp -f /usr/share/automake/config.sub .
 %configure
 %{__make}
 
