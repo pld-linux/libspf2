@@ -70,7 +70,6 @@ Statyczna biblioteka libspf2.
 %patch1 -p1
 
 %build
-cp -f /usr/share/automake/config.{guess,sub} .
 %{__libtoolize}
 %{__aclocal}
 %{__autoconf}
