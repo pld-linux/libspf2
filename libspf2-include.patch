@@ -1,0 +1,11 @@
+diff -urN libspf2-1.2.5.org/src/include/spf_server.h libspf2-1.2.5/src/include/spf_server.h
+--- libspf2-1.2.5.org/src/include/spf_server.h	2004-09-29 12:33:09.000000000 +0200
++++ libspf2-1.2.5/src/include/spf_server.h	2005-07-01 20:31:10.076179456 +0200
+@@ -20,7 +20,6 @@
+ 
+ #include "spf_record.h"
+ #include "spf_dns.h"
+-#include "spf_dns_internal.h"
+ 
+ #ifndef SPF_MAX_DNS_MECH
+ /* It is a bad idea to change this for two reasons.
