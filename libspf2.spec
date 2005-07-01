@@ -1,14 +1,13 @@
 Summary:	Implementation of the SPF specification
 Summary(pl):	Implementacja specyfikacji SPF
 Name:		libspf2
-Version:	1.0.4
-Release:	3
+Version:	1.2.5
+Release:	1
 License:	LGPL
 Group:		Libraries
 Source0:	http://libspf2.org/spf/%{name}-%{version}.tar.gz
-# Source0-md5:	5fe69ba13bf35d505b733247032a8a64
+# Source0-md5:	06ed6a3b0b54c8590679315ae2d28ad9
 Patch0:		%{name}-link.patch
-Patch1:		%{name}-ac.patch
 BuildRequires:	autoconf >= 2.59
 BuildRequires:	automake
 BuildRequires:	libtool
@@ -67,7 +66,6 @@ Statyczna biblioteka libspf2.
 %prep
 %setup -q
 %patch0 -p1
-%patch1 -p1
 
 %build
 %{__libtoolize}
