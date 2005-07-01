@@ -1,15 +1,8 @@
-diff -urN libspf2-1.0.4.org/configure.ac libspf2-1.0.4/configure.ac
---- libspf2-1.0.4.org/configure.ac	2004-07-28 22:42:48.515708512 +0200
-+++ libspf2-1.0.4/configure.ac	2004-07-28 22:56:08.559083432 +0200
-@@ -94,14 +94,14 @@
-                 [AC_CHECK_LIB([resolv],
-                         [res_query],
-                         [LIBS="$LIBS -lresolv"],
--                        [echo "cannot find resolver library"; exit 1;])
-+			[AC_CHECK_LIB([resolv],[__res_query],[LIBS="$LIBS -lresolv"],[echo "cannot find resolver library"; exit 1;])])
-                 ])
--        ], [AC_CHECK_LIB(resolv, res_query)])
-+        ], [AC_CHECK_LIB(resolv, res_query,[LIBS="$LIBS -lresolv"],[AC_CHECK_LIB(resolv, __res_query)])])
+diff -urN libspf2-1.2.5.org/configure.ac libspf2-1.2.5/configure.ac
+--- libspf2-1.2.5.org/configure.ac	2005-02-24 03:09:34.000000000 +0100
++++ libspf2-1.2.5/configure.ac	2005-07-01 20:22:58.647887912 +0200
+@@ -126,9 +126,9 @@
+ dnl [AC_CHECK_LIB(resolv, res_query)])
  
  # Checks for libraries.
 -AC_CHECK_LIB(nsl, inet_pton)
@@ -18,6 +11,6 @@ diff -urN libspf2-1.0.4.org/configure.ac libspf2-1.0.4/configure.ac
 +AC_SEARCH_LIBS(nsl, inet_pton)
 +AC_SEARCH_LIBS(socket, socket)
 +AC_SEARCH_LIBS(intl, gettext)
- 
+ AC_CHECK_LIB(pthread, pthread_create)
  
  
