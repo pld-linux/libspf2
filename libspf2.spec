@@ -1,5 +1,5 @@
 Summary:	Implementation of the SPF specification
-Summary(pl):	Implementacja specyfikacji SPF
+Summary(pl.UTF-8):   Implementacja specyfikacji SPF
 Name:		libspf2
 Version:	1.2.5
 Release:	2
@@ -19,14 +19,14 @@ BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 Libspf2 is an implementation of the SPF specification as found at
 http://www.ietf.org/internet-drafts/draft-mengwong-spf-01.txt .
 
-%description -l pl
-Libspf2 jest implementacj± specyfikacji SPF, która znajduje siê pod
+%description -l pl.UTF-8
+Libspf2 jest implementacjÄ… specyfikacji SPF, ktÃ³ra znajduje siÄ™ pod
 adresem
 http://www.ietf.org/internet-drafts/draft-mengwong-spf-01.txt .
 
 %package tools
 Summary:	Tools distributed with libspf2
-Summary(pl):	Programy narzêdziowe, dystrybuowane z libspf2
+Summary(pl.UTF-8):   Programy narzÄ™dziowe, dystrybuowane z libspf2
 Group:		Networking/Utilities
 Requires:	%{name} = %{version}-%{release}
 
@@ -34,13 +34,13 @@ Requires:	%{name} = %{version}-%{release}
 Tools distributed with libspf2; at the time of writing: spf_example,
 spf_example_2mx, spfd, spfquery and spftest.
 
-%description tools -l pl
-Programy narzêdziowe, dystrybuowane z libspf2; w momencie pisania tego
+%description tools -l pl.UTF-8
+Programy narzÄ™dziowe, dystrybuowane z libspf2; w momencie pisania tego
 opisu: spf_example, spf_example_2mx, spfd, spfquery i spftest.
 
 %package devel
 Summary:	Header files for libspf2 library
-Summary(pl):	Pliki nag³ówkowe biblioteki libspf2
+Summary(pl.UTF-8):   Pliki nagÅ‚Ã³wkowe biblioteki libspf2
 Group:		Development/Libraries
 Requires:	%{name} = %{version}-%{release}
 Obsoletes:	libspf_alt-devel
@@ -48,12 +48,12 @@ Obsoletes:	libspf_alt-devel
 %description devel
 Header files for libspf2 library.
 
-%description devel -l pl
-Pliki nag³ówkowe biblioteki libspf2.
+%description devel -l pl.UTF-8
+Pliki nagÅ‚Ã³wkowe biblioteki libspf2.
 
 %package static
 Summary:	Static libspf2 library
-Summary(pl):	Statyczna biblioteka libspf2
+Summary(pl.UTF-8):   Statyczna biblioteka libspf2
 Group:		Development/Libraries
 Requires:	%{name}-devel = %{version}-%{release}
 Obsoletes:	libspf_alt-static
@@ -61,7 +61,7 @@ Obsoletes:	libspf_alt-static
 %description static
 Static libspf2 library.
 
-%description static -l pl
+%description static -l pl.UTF-8
 Statyczna biblioteka libspf2.
 
 %prep
