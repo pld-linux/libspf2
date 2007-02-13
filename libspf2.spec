@@ -1,5 +1,5 @@
 Summary:	Implementation of the SPF specification
-Summary(pl.UTF-8):   Implementacja specyfikacji SPF
+Summary(pl.UTF-8):	Implementacja specyfikacji SPF
 Name:		libspf2
 Version:	1.2.5
 Release:	2
@@ -26,7 +26,7 @@ http://www.ietf.org/internet-drafts/draft-mengwong-spf-01.txt .
 
 %package tools
 Summary:	Tools distributed with libspf2
-Summary(pl.UTF-8):   Programy narzędziowe, dystrybuowane z libspf2
+Summary(pl.UTF-8):	Programy narzędziowe, dystrybuowane z libspf2
 Group:		Networking/Utilities
 Requires:	%{name} = %{version}-%{release}
 
@@ -40,7 +40,7 @@ opisu: spf_example, spf_example_2mx, spfd, spfquery i spftest.
 
 %package devel
 Summary:	Header files for libspf2 library
-Summary(pl.UTF-8):   Pliki nagłówkowe biblioteki libspf2
+Summary(pl.UTF-8):	Pliki nagłówkowe biblioteki libspf2
 Group:		Development/Libraries
 Requires:	%{name} = %{version}-%{release}
 Obsoletes:	libspf_alt-devel
@@ -53,7 +53,7 @@ Pliki nagłówkowe biblioteki libspf2.
 
 %package static
 Summary:	Static libspf2 library
-Summary(pl.UTF-8):   Statyczna biblioteka libspf2
+Summary(pl.UTF-8):	Statyczna biblioteka libspf2
 Group:		Development/Libraries
 Requires:	%{name}-devel = %{version}-%{release}
 Obsoletes:	libspf_alt-static
