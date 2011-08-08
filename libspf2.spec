@@ -1,13 +1,17 @@
+# TODO
+# ./configure[3000]: AX_WITH_PERL: not found - needed after regeneration
+
 Summary:	Implementation of the SPF specification
 Summary(pl.UTF-8):	Implementacja specyfikacji SPF
 Name:		libspf2
 Version:	1.2.9
-Release:	2
+Release:	3
 License:	LGPL
 Group:		Libraries
 Source0:	http://libspf2.org/spf/%{name}-%{version}.tar.gz
 # Source0-md5:	3305df4d1b13ca964d80b23bb5e4e2b6
 Patch0:		%{name}-link.patch
+URL:		http://www.libspf2.org/
 BuildRequires:	autoconf >= 2.59
 BuildRequires:	automake
 BuildRequires:	libtool
@@ -16,12 +20,12 @@ BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
 %description
 Libspf2 is an implementation of the SPF specification as found at
-http://www.ietf.org/internet-drafts/draft-mengwong-spf-01.txt .
+<http://www.ietf.org/internet-drafts/draft-mengwong-spf-01.txt>.
 
 %description -l pl.UTF-8
 Libspf2 jest implementacją specyfikacji SPF, która znajduje się pod
-adresem
-http://www.ietf.org/internet-drafts/draft-mengwong-spf-01.txt .
+<adresem
+http://www.ietf.org/internet-drafts/draft-mengwong-spf-01.txt>.
 
 %package tools
 Summary:	Tools distributed with libspf2
@@ -72,13 +76,12 @@ Statyczna biblioteka libspf2.
 %{__aclocal}
 %{__autoconf}
 %{__autoheader}
-%{__automake} 
+%{__automake}
 %configure
 %{__make}
 
 %install
 rm -rf $RPM_BUILD_ROOT
-
 %{__make} install \
 	DESTDIR=$RPM_BUILD_ROOT
 
@@ -91,19 +94,27 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(644,root,root,755)
 %doc README TODO LICENSES INSTALL
-%attr(755,root,root) %{_libdir}/lib*.so.*.*.*
+%attr(755,root,root) %{_libdir}/libspf2.so.*.*.*
+%ghost %{_libdir}/libspf2.so.2
 
 %files tools
 %defattr(644,root,root,755)
-%attr(755,root,root) %{_bindir}/*
+%attr(755,root,root) %{_bindir}/spf_example
+%attr(755,root,root) %{_bindir}/spf_example_static
+%attr(755,root,root) %{_bindir}/spfd
+%attr(755,root,root) %{_bindir}/spfd_static
+%attr(755,root,root) %{_bindir}/spfquery
+%attr(755,root,root) %{_bindir}/spfquery_static
+%attr(755,root,root) %{_bindir}/spftest
+%attr(755,root,root) %{_bindir}/spftest_static
 
 %files devel
 %defattr(644,root,root,755)
-%attr(755,root,root) %{_libdir}/lib*.so
-%{_libdir}/lib*.la
+%attr(755,root,root) %{_libdir}/libspf2.so
+%{_libdir}/libspf2.la
 %dir %{_includedir}/spf2
 %{_includedir}/spf2/*.h
 
 %files static
 %defattr(644,root,root,755)
-%{_libdir}/lib*.a
+%{_libdir}/libspf2.a
