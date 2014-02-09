@@ -4,12 +4,12 @@
 Summary:	Implementation of the SPF specification
 Summary(pl.UTF-8):	Implementacja specyfikacji SPF
 Name:		libspf2
-Version:	1.2.9
-Release:	3
+Version:	1.2.10
+Release:	1
 License:	LGPL
 Group:		Libraries
-Source0:	http://libspf2.org/spf/%{name}-%{version}.tar.gz
-# Source0-md5:	3305df4d1b13ca964d80b23bb5e4e2b6
+Source0:	http://www.libspf2.org/spf/%{name}-%{version}.tar.gz
+# Source0-md5:	7bb9937d0705649eaa8646de66dc3562
 Patch0:		%{name}-link.patch
 URL:		http://www.libspf2.org/
 BuildRequires:	autoconf >= 2.59
