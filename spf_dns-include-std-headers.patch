@@ -1,0 +1,62 @@
+Author: Magnus Holmgren <holmgren@debian.org>
+Description: Include arpa/nameser.h and netdb.h from spf_dns.h 
+ instead of defining the constants needed unless certain HAVE_ macros are defined.
+ Updated for libspf2 1.2.8/9 by Scott Kitterman <scott@kitterman.com>
+
+--- libspf2-1.2.9~/src/include/spf_dns.h	2008-10-27 12:27:14.000000000 -0400
++++ libspf2-1.2.9/src/include/spf_dns.h	2008-11-04 10:10:58.000000000 -0500
+@@ -63,48 +63,19 @@
+  * 
+  */
+ 
++/* The following two header files might not exist on all platforms,
++ * but at least they exist on Debian with libc6.
++ */
++#include <arpa/nameser.h>
++#include <netdb.h>
+ 
+ /*
+- * For those who don't have <arpa/nameserv.h>
++ * Type 99 decl does not exist in Debian libc6 (not even 2.7)
+  */
+-
+-/* XXX This should use a more sensible define. */
+-#if !defined( HAVE_NS_TYPE )
+-
+-#define	ns_t_invalid	0
+-#define	ns_t_a		1
+-#define	ns_t_ns		2
+-#define	ns_t_cname	5
+-#define	ns_t_ptr	12
+-#define	ns_t_mx		15
+-#define	ns_t_txt	16
+-#define ns_t_aaaa	28
+-/* #define ns_t_a6		38 */
+-#define	ns_t_any        255		/**< Wildcard match. */
+-
+-typedef int	ns_type;
+-#endif
+-
+ #if ! HAVE_DECL_NS_T_SPF
+ #define ns_t_spf	99
+ #endif
+ 
+-#if ! HAVE_DECL_NS_T_INVALID
+-#define	ns_t_invalid	0
+-#endif
+-
+-
+-/*
+- * For those who don't have <netdb.h>
+- */
+-
+-#if !defined(HAVE_NETDB_H) && !defined(_WIN32)
+-#define NETDB_SUCCESS	0
+-#define	HOST_NOT_FOUND 	1		/**< NXDOMAIN (authoritative answer)*/
+-#define	TRY_AGAIN		2		/**< SERVFAIL (no authoritative answer)*/
+-#define	NO_RECOVERY		3		/**< invalid/unimplmeneted query	*/
+-#define	NO_DATA			4		/**< host found, but no RR of req type*/
+-#endif
+ typedef int SPF_dns_stat_t;
+ 
+ typedef struct SPF_dns_server_struct SPF_dns_server_t;

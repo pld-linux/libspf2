@@ -1,0 +1,16 @@
+Description: Stop trying to look up the dedicated SPF DNS RR type,
+ which was abolished by RFC 7208. The rr_type variable and the all the
+ "goto retry" commands could be deleted as well, but let's keep the
+ patch minimal.
+
+--- a/src/libspf2/spf_server.c 2012-01-28 09:24:47.000000000 +0100
++++ b/src/libspf2/spf_server.c 2014-06-19 14:09:07.000000000 +0200
+@@ -346,7 +346,7 @@
+ 						spf_response, spf_recordp);
+
+ 	/* I am VERY, VERY sorry about the gotos. Shevek. */
+-	rr_type = ns_t_spf;
++	rr_type = ns_t_txt;
+ retry:
+ 	rr_txt = SPF_dns_lookup(resolver, domain, rr_type, TRUE);
+ 
