@@ -5,7 +5,7 @@ Summary:	Implementation of the SPF specification
 Summary(pl.UTF-8):	Implementacja specyfikacji SPF
 Name:		libspf2
 Version:	1.2.11
-Release:	1
+Release:	2
 License:	LGPL
 Group:		Libraries
 # Source0:	http://www.libspf2.org/spf/%{name}-%{version}.tar.gz
@@ -13,6 +13,8 @@ Source0:	https://github.com/shevek/libspf2/tarball/4915c30#/%{name}.tar.gz
 # Source0-md5:	ad5f1b48e4f2b5561df99ca7cbf30e92
 Patch0:		%{name}-link.patch
 Patch1:		0001-remove-libreplace-unneeded-on-Linux.patch
+# https://github.com/shevek/libspf2/pull/44
+Patch2:         integer-underflow.patch
 URL:		http://www.libspf2.org/
 BuildRequires:	autoconf >= 2.59
 BuildRequires:	automake
@@ -74,6 +76,7 @@ Statyczna biblioteka libspf2.
 %setup -q -n shevek-libspf2-4915c30
 %patch0 -p1
 %patch1 -p1
+%patch2 -p1
 
 %build
 %{__libtoolize}
