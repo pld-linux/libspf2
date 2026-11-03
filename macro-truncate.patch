@@ -1,0 +1,31 @@
+%{l1} or %{d3} on a value with fewer parts than requested dropped its
+first character ("user" -> "ser"); RFC 7208 7.3 keeps the whole value.
+A leading delimiter starts an empty part ("-foo": %{l1-} -> "foo",
+%{l2-} -> ".foo"), and an empty value stays empty.
+Based on https://github.com/shevek/libspf2/pull/43, which still drops
+the character when 0 < delimiters < requested.
+
+--- a/src/libspf2/spf_expand.c
++++ b/src/libspf2/spf_expand.c
+@@ -344,17 +344,16 @@
+ 
+ 		/* truncate, from the right hand side. */
+ 		if (d->dv.num_rhs > 0) {
++			/* Keep the rightmost num_rhs parts; a value with fewer
++			 * parts is kept whole, a leading '.' starts an empty part. */
+ 			p_read_end = munged_var + len;		/* const, at '\0' */
+-			p_write = munged_var + len - 1;
++			p_write = munged_var + len;
+ 			num_found = 0;
+ 			while (p_write > munged_var) {
+-				if (*p_write == '.')
+-					num_found++;
+-				if (num_found == d->dv.num_rhs)
++				if (p_write[-1] == '.' && ++num_found == d->dv.num_rhs)
+ 					break;
+ 				p_write--;
+ 			}
+-			p_write++;		/* Move to just after the '.' */
+ 			/* This moves the '\0' as well. */
+ 			len = p_read_end - p_write;
+ 			memmove(munged_var, p_write, len + 1);

@@ -1,0 +1,84 @@
+RFC 7208 5, 6.2: a ':' or '=' is followed by a domain-spec, which is
+never empty, but "a:", "a:/24", "include:", "exists:", "redirect=",
+"exp=" and the like compiled, printed back as records that no longer
+compile, and an empty value made SPF_c_parse_cidr() step before the
+start of its input. The RFC 7208 test suite expects permerror
+(*-empty-domain); test_parser.txt expected "a:/32//12" to compile.
+
+--- a/src/libspf2/spf_compile.c
++++ b/src/libspf2/spf_compile.c
+@@ -228,10 +228,11 @@
+ 	memset(data, 0, sizeof(SPF_data_cidr_t));
+ 	data->parm_type = PARM_CIDR;
+ 
+-	/* Find the beginning of the CIDR length notation.
+-	 * XXX This assumes that there is a non-digit in the string.
+-	 * This is always true for SPF records with domainspecs, since
+-	 * there has to be an = or a : before it. */
++	/* src starts after the ':' or at the '/', so it may be empty. */
++	if (*src_len == 0)
++		return SPF_E_SUCCESS;
++
++	/* Find the beginning of the CIDR length notation. */
+ 	idx = *src_len - 1;
+ 	while (idx > 0 && isdigit( (unsigned char)(src[idx]) ))
+ 		idx--;
+@@ -249,6 +250,8 @@
+ 				return err;
+ 			/* now back up and see if there is a ipv4 cidr length */
+ 			*src_len = idx - 1;	/* The index of the first '/' */
++			if (*src_len == 0)
++				return SPF_E_SUCCESS;
+ 			idx = *src_len - 1;	/* Last character of what is before. */
+ 			while (idx > 0 && isdigit( (unsigned char)(src[idx]) ))
+ 				idx--;
+@@ -730,6 +733,14 @@
+ 		}
+ 	}
+ 
++	/* RFC 7208 5, 6.1: a ':' or '=' is followed by a domain-spec, which
++	 * is never empty; only the '/' form passes CIDR_ONLY. */
++	if (cidr_ok != CIDR_ONLY && src_len == 0)
++		return SPF_response_add_error_ptr(spf_response,
++						SPF_E_MISSING_OPT,
++						NULL, src,
++						"Empty domain-spec after mechanism");
++
+ 	return SPF_c_parse_macro(spf_server, spf_response,
+ 			data, data_used, data_avail,
+ 			src, src_len, big_err, is_mod);
+@@ -1518,6 +1529,14 @@
+ 				p = val_end;
+ 				break;
+ 			}
++			/* RFC 7208 6.2: exp= takes a domain-spec, never empty */
++			if ( STREQ_SIZEOF_N(name_start, "exp", name_len) && p + 1 == val_end ) {
++				SPF_response_add_error_ptr(spf_response, SPF_E_MISSING_OPT,
++								NULL, name_start,
++								"Empty domain-spec after exp=");
++				p = val_end;
++				break;
++			}
+ 
+ 			p++;
+ 			val_start = p;
+--- a/tests/test_parser.txt
++++ b/tests/test_parser.txt
+@@ -162,13 +162,13 @@
+ 
+ spftest spf "v=spf1 a:/32//12"
+ rec-in          /.*/ SPF record in:  v=spf1 a:/32//12
+-err-msg         /.*/ no errors
+-rec-out         /.*/ SPF record:  v=spf1 a//12
++err-msg         /.*/ /Empty domain-spec/
++rec-out         /.*/ Unknown
+ 
+ spftest spf "v=spf1 a:/32//128"
+ rec-in          /.*/ SPF record in:  v=spf1 a:/32//128
+-err-msg         /.*/ no errors
+-rec-out         /.*/ SPF record:  v=spf1 a
++err-msg         /.*/ /Empty domain-spec/
++rec-out         /.*/ Unknown
+ 
+ spftest spf "v=spf1 a:/x32//12"
+ rec-in          /.*/ SPF record in:  v=spf1 a:/x32//12

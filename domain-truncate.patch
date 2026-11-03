@@ -1,0 +1,85 @@
+RFC 7208 7.3: an expanded domain name over 253 chars is truncated on
+the left, label by label, until it fits; libspf2 queried the whole name
+(a, mx, ptr, include, redirect, exists and the exp= target). A trailing
+root dot does not count towards the 253.
+
+--- a/src/include/spf_internal.h
++++ b/src/include/spf_internal.h
+@@ -19,6 +19,8 @@
+ #ifndef INC_SPF_INTERNAL
+ #define INC_SPF_INTERNAL
+ 
++#include <string.h>
++
+ #ifndef TRUE
+ #define TRUE 1
+ #define FALSE 0
+@@ -137,6 +139,23 @@
+ 
+ char *SPF_sanitize( SPF_server_t *spf_server, char *str );
+ 
++/* RFC 7208 7.3: an expanded domain name over 253 chars loses labels on
++ * the left until it fits; a trailing dot (the root) does not count. */
++static inline const char *SPF_domain_truncate( const char *domain )
++{
++	size_t			 len = strlen(domain);
++	const char		*dot;
++
++	if (len > 0 && domain[len - 1] == '.')
++		len--;
++
++	while (len > 253 && (dot = strchr(domain, '.')) != NULL) {
++		len -= dot + 1 - domain;
++		domain = dot + 1;
++	}
++	return domain;
++}
++
+ void SPF_print_sizeof(void);
+ 
+ /**
+--- a/src/libspf2/spf_get_exp.c
++++ b/src/libspf2/spf_get_exp.c
+@@ -153,9 +153,11 @@
+ 	resolver = spf_server->resolver;
+ 
+ 	if (resolver->get_exp)
+-		return resolver->get_exp(spf_server, *bufp, bufp, buflenp);
++		return resolver->get_exp(spf_server, SPF_domain_truncate(*bufp),
++						bufp, buflenp);
+ 
+-	rr_txt = SPF_dns_lookup(resolver, *bufp, ns_t_txt, TRUE);
++	rr_txt = SPF_dns_lookup(resolver, SPF_domain_truncate(*bufp),
++					ns_t_txt, TRUE);
+ 	if (rr_txt == NULL) {
+ 		SPF_dns_rr_free(rr_txt);
+ 		RETURN_DEFAULT_EXP();
+--- a/src/libspf2/spf_interpret.c
++++ b/src/libspf2/spf_interpret.c
+@@ -743,7 +743,7 @@
+ 				SPF_FREE_LOOKUP_DATA();					\
+ 				return DONE_PERMERR(err);				\
+ 			}											\
+-			lookup = buf;								\
++			lookup = SPF_domain_truncate(buf);			\
+ 		}												\
+ 	} while(0)
+ #define SPF_FREE_LOOKUP_DATA() \
+@@ -1063,7 +1063,7 @@
+ 				SPF_FREE_LOOKUP_DATA();
+ 				return DONE_PERMERR( err );
+ 			}
+-			lookup = buf;
++			lookup = SPF_domain_truncate(buf);
+ 
+ 			/* XXX Maintain a stack depth here. Limit at 10. */
+ 			if (strcmp(lookup, spf_request->cur_dom) == 0) {
+@@ -1222,7 +1222,7 @@
+ 				SPF_FREE_LOOKUP_DATA();
+ 				return DONE_TEMPERR( err );
+ 			}
+-			lookup = buf;
++			lookup = SPF_domain_truncate(buf);
+ 
+ 			rr_a = SPF_dns_lookup(resolver, lookup, ns_t_a, FALSE );
+ 

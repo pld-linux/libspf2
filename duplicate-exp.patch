@@ -1,0 +1,29 @@
+RFC 7208 6: exp= may appear at most once, otherwise the result is
+permerror; libspf2 compiled every exp= without complaint.
+
+--- a/src/libspf2/spf_compile.c
++++ b/src/libspf2/spf_compile.c
+@@ -1234,6 +1234,7 @@
+ 	const SPF_mechtype_t*redirect_mechtype = NULL;
+ 	int					 redirect_prefix = PREFIX_UNKNOWN;
+ 	const char			*redirect_val_start;
++	int					 num_exp = 0;
+ 
+ 
+ 	/*
+@@ -1496,6 +1497,15 @@
+ 			if ( STREQ_SIZEOF(name_start, "redirect=") )
+ 				goto compile_mech;
+ 
++			/* RFC 7208 6: at most once, else permerror */
++			if ( STREQ_SIZEOF_N(name_start, "exp", name_len) && num_exp++ > 0 ) {
++				SPF_response_add_error_ptr(spf_response, SPF_E_SYNTAX,
++								NULL, name_start,
++								"Multiple exp= modifiers");
++				p = val_end;
++				break;
++			}
++
+ 			p++;
+ 			val_start = p;
+ 			err = SPF_c_mod_add(spf_server,

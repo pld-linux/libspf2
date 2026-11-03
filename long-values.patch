@@ -1,0 +1,428 @@
+RFC 7208 sets no length limit on a single literal, mechanism, modifier
+or explanation, but a literal past 255 chars or a value compiling past
+511 bytes made the record a permerror (an explanation: the default
+text). A long literal now continues in further string blocks and the
+compile buffers are sized from the value; only the whole-record limits
+remain. The record printer read two chars past a literal ending in %
+(or %2), which in a heap buffer is uninitialised padding.
+
+--- a/src/libspf2/spf_compile.c
++++ b/src/libspf2/spf_compile.c
+@@ -55,15 +55,15 @@
+ } SPF_domspec_t;
+ 
+ /**
+- * This is greater than any possible total mechanism or modifier.
+- *	 SPF_MAX_MOD_LEN  + SPF_MAX_STR_LEN
+- *	 SPF_MAX_MECH_LEN + SPF_MAX_STR_LEN
++ * Upper bound on the compiled size of a macro-string of src_len chars:
++ * a 4-char %{x} gives a 4-byte variable plus the next string header
++ * (4 bytes + 3 alignment), a literal char at most 3/2 bytes (%-).
+  */
+-#define SPF_RECORD_BUFSIZ	  4096
++#define SPF_MACRO_DATA_MAX(src_len)	(4 * (src_len) + 16)
+ 
+ /**
+- * Limits on a whole compiled record. SPF_MAX_MECH_LEN and
+- * SPF_MAX_MOD_LEN bound a single mechanism or modifier only.
++ * Limits on a whole compiled record; RFC 7208 sets none on a single
++ * mechanism, modifier or literal.
+  */
+ #define SPF_MAX_RECORD_MECH_LEN	16384
+ #define SPF_MAX_RECORD_MOD_LEN	16384
+@@ -71,8 +71,6 @@
+ #define SPF_MAX_NUM_MECH		255
+ #define SPF_MAX_NUM_MOD			255
+ 
+-#define ALIGN_DECL(decl) union { double d; long l; decl } __attribute__((aligned(_ALIGN_SZ))) u
+-#define ALIGNED_DECL(var) u.var
+ 
+ 
+ 
+@@ -473,8 +471,13 @@
+ 			ds_len = 0;												\
+ 		} while(0)
+ 
++/* SPF_data_str_t.len is one byte: a longer literal continues in a new block. */
+ #define SPF_ENSURE_STRING_AVAIL(_len)	do {		\
+-			if (ds_len + _len > ds_avail)			\
++			if (ds_len + (_len) > SPF_MAX_STR_LEN) {	\
++				SPF_FINI_STRING_LITERAL();			\
++				SPF_INIT_STRING_LITERAL(data_avail - *data_used);	\
++			}										\
++			if (ds_len + (_len) > ds_avail)			\
+ 				return SPF_response_add_error_ptr(spf_response,	\
+ 								SPF_E_BIG_STRING, NULL, src,	\
+ 							"String literal fragment too long "	\
+@@ -484,13 +487,6 @@
+ 
+ #define SPF_FINI_STRING_LITERAL()		do { \
+ 			if ( ds_len > 0 ) {										\
+-				if ( ds_len > SPF_MAX_STR_LEN ) {					\
+-					return SPF_response_add_error_ptr(spf_response,		\
+-									SPF_E_BIG_STRING, NULL, src,	\
+-								"String literal too long "			\
+-								"(%d chars, %d max)",				\
+-								ds_len, SPF_MAX_STR_LEN);			\
+-				}													\
+ 				data->ds.len = ds_len;								\
+ 				len = sizeof( *data ) + ds_len;						\
+ 				SPF_ADD_LEN_TO(*data_used, len, data_avail);		\
+@@ -532,6 +528,7 @@
+ 	char				*dst;
+ 	size_t				 ds_avail;
+ 	size_t				 ds_len;
++	size_t				 rest, n;
+ 
+ 	if (spf_server->debug)
+ 		SPF_debugf("Parsing macro starting at %s", src);
+@@ -566,12 +563,19 @@
+ 				SPF_debugf("Adding string literal (%lu): '%*.*s'",
+ 								(unsigned long)len,
+ 								(int)len, (int)len, &src[idx]);
+-			/* XXX Bounds-check here. */
+-			SPF_ENSURE_STRING_AVAIL(len);
+-			memcpy(dst, &src[idx], len);
+-			ds_len += len;
+-			dst += len;
+-			idx += len;
++			/* not len: SPF_FINI_STRING_LITERAL() reuses it */
++			for (rest = len; rest > 0; rest -= n) {
++				n = SPF_MAX_STR_LEN - ds_len;
++				if (n == 0)
++					n = SPF_MAX_STR_LEN;	/* starts a new block */
++				if (n > rest)
++					n = rest;
++				SPF_ENSURE_STRING_AVAIL(n);
++				memcpy(dst, &src[idx], n);
++				ds_len += n;
++				dst += n;
++				idx += n;
++			}
+ 
+ 			/* If len == 0 then we never entered the while(). Thus
+ 			 * if idx == src_len, then len != 0 and we reach this test.
+@@ -840,20 +844,24 @@
+ 				const SPF_mechtype_t *mechtype, int prefix,
+ 				const char **mech_value)
+ {
+-	/* If this buffer is an irregular size, intel gcc does not align
+-	 * it properly, and all hell breaks loose. */
+-ALIGN_DECL(
+-	char				 buf[SPF_RECORD_BUFSIZ];
+-);
+-	SPF_mech_t			*spf_mechanism = (SPF_mech_t *)ALIGNED_DECL(buf);
++	SPF_mech_t			*spf_mechanism;
+ 	SPF_data_t			*data;
+ 	size_t				 data_len;
++	size_t				 data_avail;
+ 	size_t				 len;
+ 	size_t				 src_len;
+ 
+ 	SPF_errcode_t		 err;
+ 
+-	memset(u.buf, 'B', sizeof(u.buf));	/* Poison the buffer. */
++	src_len = strcspn(*mech_value, " ");
++	data_avail = SPF_MACRO_DATA_MAX(src_len);
++	if (data_avail < sizeof(struct in6_addr))
++		data_avail = sizeof(struct in6_addr);
++	spf_mechanism = malloc(sizeof(SPF_mech_t) + data_avail);
++	if (spf_mechanism == NULL)
++		return SPF_response_add_error_ptr(spf_response,
++						SPF_E_NO_MEMORY, NULL, NULL,
++						"Failed to allocate memory for mechanism");
+ 	memset(spf_mechanism, 0, sizeof(SPF_mech_t));
+ 
+ 	if (spf_server->debug)
+@@ -869,8 +877,6 @@
+ 	data = SPF_mech_data(spf_mechanism);
+ 	data_len = 0;
+ 
+-	src_len = strcspn(*mech_value, " ");
+-
+ 	switch (mechtype->mech_type) {
+ 		/* We know the properties of IP4 and IP6. */
+ 			case MECH_IP4:
+@@ -911,7 +917,7 @@
+ 					(*mech_value)++; src_len--;
+ 					err = SPF_c_parse_domainspec(spf_server,
+ 									spf_response,
+-									data, &data_len, SPF_MAX_MECH_LEN,
++									data, &data_len, data_avail,
+ 									*mech_value, src_len,
+ 									SPF_E_BIG_MECH,
+ 									mechtype->has_cidr, FALSE);
+@@ -933,7 +939,7 @@
+ 				else {
+ 					err = SPF_c_parse_domainspec(spf_server,
+ 									spf_response,
+-									data, &data_len, SPF_MAX_MECH_LEN,
++									data, &data_len, data_avail,
+ 									*mech_value, src_len,
+ 									SPF_E_BIG_MECH,
+ 									CIDR_ONLY, FALSE);
+@@ -966,32 +972,35 @@
+ 	len += data_len;
+ 
+ 	/* Copy the thing in. */
+-	if (err == SPF_E_SUCCESS) {
+-		if (spf_record->num_mech >= SPF_MAX_NUM_MECH)
+-			return SPF_response_add_error_ptr(spf_response,
+-							SPF_E_BIG_MECH, NULL, *mech_value,
+-							"Too many mechanisms (%d max)",
+-							SPF_MAX_NUM_MECH);
+-		if (spf_record->mech_len + len > SPF_MAX_RECORD_MECH_LEN)
+-			return SPF_response_add_error_ptr(spf_response,
+-							SPF_E_BIG_MECH, NULL, *mech_value,
+-							"Mechanisms too long (%d bytes max)",
+-							SPF_MAX_RECORD_MECH_LEN);
++	if (err != SPF_E_SUCCESS)
++		;
++	else if (spf_record->num_mech >= SPF_MAX_NUM_MECH)
++		err = SPF_response_add_error_ptr(spf_response,
++						SPF_E_BIG_MECH, NULL, *mech_value,
++						"Too many mechanisms (%d max)",
++						SPF_MAX_NUM_MECH);
++	else if (spf_record->mech_len + len > SPF_MAX_RECORD_MECH_LEN)
++		err = SPF_response_add_error_ptr(spf_response,
++						SPF_E_BIG_MECH, NULL, *mech_value,
++						"Mechanisms too long (%d bytes max)",
++						SPF_MAX_RECORD_MECH_LEN);
++	else if (SPF_c_ensure_capacity((void **)&spf_record->mech_first,
++						&spf_record->mech_size,
++						spf_record->mech_len + len) < 0)
++		err = SPF_response_add_error_ptr(spf_response,
++						SPF_E_NO_MEMORY,
++						NULL, NULL,
++						"Failed to allocate memory for mechanism");
++	else {
+ 		if (mechtype->is_dns_mech)
+ 			spf_record->num_dns_mech++;
+-		if (SPF_c_ensure_capacity((void **)&spf_record->mech_first,
+-							&spf_record->mech_size,
+-							spf_record->mech_len + len) < 0)
+-			return SPF_response_add_error_ptr(spf_response,
+-							SPF_E_NO_MEMORY,
+-							NULL, NULL,
+-							"Failed to allocate memory for mechanism");
+ 		memcpy( (char *)spf_record->mech_first + spf_record->mech_len,
+ 			spf_mechanism,
+ 			len);
+ 		spf_record->mech_len += len;
+ 		spf_record->num_mech++;
+ 	}
++	free(spf_mechanism);
+ 
+ 	*mech_value += src_len;
+ 
+@@ -1005,14 +1014,10 @@
+ 				const char *mod_name, size_t name_len,
+ 				const char **mod_value)
+ {
+-	/* If this buffer is an irregular size, intel gcc does not align
+-	 * it properly, and all hell breaks loose. */
+-ALIGN_DECL(
+-	char				 buf[SPF_RECORD_BUFSIZ];
+-);
+-	SPF_mod_t			*spf_modifier = (SPF_mod_t *)u.buf;
++	SPF_mod_t			*spf_modifier;
+ 	SPF_data_t			*data;
+ 	size_t				 data_len;
++	size_t				 data_avail;
+ 	size_t				 len;
+ 	size_t				 src_len;
+ 
+@@ -1022,64 +1027,67 @@
+ 		SPF_debugf("Adding modifier name=%lu@%s, value=%s",
+ 						(unsigned long)name_len, mod_name, *mod_value);
+ 
+-	memset(u.buf, 'A', sizeof(u.buf));
+-	memset(spf_modifier, 0, sizeof(SPF_mod_t));
++	src_len = strcspn(*mod_value, " ");
+ 
+-	/* Stored modifiers never change the result (redirect= is compiled
+-	 * as a mechanism), so one that does not fit is skipped, not an error. */
+-	if ( name_len > SPF_MAX_MOD_LEN )
+-		return SPF_response_add_warn_ptr(spf_response,
+-						SPF_E_BIG_MOD, NULL, mod_name,
+-						"Modifier name too long (%d chars max), ignored",
+-						SPF_MAX_MOD_LEN);
++	/* Name and data may not fit the record, but the value is still parsed:
++	 * its syntax errors are a permerror (RFC 7208 4.6). */
++	len = _align_sz(sizeof( SPF_mod_t ) + name_len);
++	data_avail = SPF_MACRO_DATA_MAX(src_len);
++	spf_modifier = malloc(len + data_avail);
++	if (spf_modifier == NULL)
++		return SPF_response_add_error_ptr(spf_response,
++						SPF_E_NO_MEMORY, NULL, NULL,
++						"Failed to allocate memory for modifier");
++	memset(spf_modifier, 0, sizeof(SPF_mod_t));
+ 
+ 	spf_modifier->name_len = name_len;
+ 	spf_modifier->data_len = 0;
+ 
+-	/* So that spf_modifier + len == SPF_mod_data(spf_modifier) */
+-	len = _align_sz(sizeof( SPF_mod_t ) + name_len);
+-
+ 	memcpy(SPF_mod_name(spf_modifier), mod_name, name_len);
+ 
+-	data = SPF_mod_data(spf_modifier);
++	/* SPF_mod_data(), without trusting the 16-bit name_len */
++	data = (SPF_data_t *)((char *)spf_modifier + len);
+ 	data_len = 0;
+ 
+-	src_len = strcspn(*mod_value, " ");
+-
+ 	err = SPF_c_parse_macro(spf_server,
+ 					spf_response,
+-					data, &data_len, SPF_MAX_MOD_LEN,
++					data, &data_len, data_avail,
+ 					*mod_value, src_len,
+ 					SPF_E_BIG_MOD,
+ 					TRUE );
+ 	spf_modifier->data_len = data_len;
+ 	len += data_len;
+ 
+-	/* Copy the thing in. */
+-	if (err == SPF_E_SUCCESS) {
+-		if (spf_record->num_mod >= SPF_MAX_NUM_MOD)
+-			return SPF_response_add_warn_ptr(spf_response,
+-							SPF_E_BIG_MOD, NULL, mod_name,
+-							"Too many modifiers (%d max), ignored",
+-							SPF_MAX_NUM_MOD);
+-		if (spf_record->mod_len + len > SPF_MAX_RECORD_MOD_LEN)
+-			return SPF_response_add_warn_ptr(spf_response,
+-							SPF_E_BIG_MOD, NULL, mod_name,
+-							"Modifiers too long (%d bytes max), ignored",
+-							SPF_MAX_RECORD_MOD_LEN);
+-		if (SPF_c_ensure_capacity((void **)&spf_record->mod_first,
+-							&spf_record->mod_size,
+-							spf_record->mod_len + len) < 0)
+-			return SPF_response_add_error_ptr(spf_response,
+-							SPF_E_NO_MEMORY,
+-							NULL, NULL,
+-							"Failed to allocate memory for modifier");
++	/* Copy the thing in. Stored modifiers never change the result
++	 * (redirect= is compiled as a mechanism), so one that does not fit
++	 * is skipped, not an error. */
++	if (err != SPF_E_SUCCESS)
++		;
++	else if (spf_record->num_mod >= SPF_MAX_NUM_MOD)
++		err = SPF_response_add_warn_ptr(spf_response,
++						SPF_E_BIG_MOD, NULL, mod_name,
++						"Too many modifiers (%d max), ignored",
++						SPF_MAX_NUM_MOD);
++	else if (spf_record->mod_len + len > SPF_MAX_RECORD_MOD_LEN)
++		err = SPF_response_add_warn_ptr(spf_response,
++						SPF_E_BIG_MOD, NULL, mod_name,
++						"Modifiers too long (%d bytes max), ignored",
++						SPF_MAX_RECORD_MOD_LEN);
++	else if (SPF_c_ensure_capacity((void **)&spf_record->mod_first,
++						&spf_record->mod_size,
++						spf_record->mod_len + len) < 0)
++		err = SPF_response_add_error_ptr(spf_response,
++						SPF_E_NO_MEMORY,
++						NULL, NULL,
++						"Failed to allocate memory for modifier");
++	else {
+ 		memcpy( (char *)spf_record->mod_first + spf_record->mod_len,
+ 			spf_modifier,
+ 			len);
+ 		spf_record->mod_len += len;
+ 		spf_record->num_mod++;
+ 	}
++	free(spf_modifier);
+ 
+ 	return err;
+ }
+@@ -1096,6 +1104,7 @@
+ 
+ 	int			 found_non_ip;
+ 	int			 found_valid_tld;
++	int			 prev_type;
+ 	
+ 	SPF_mech_t  *mech;
+ 	SPF_data_t  *data;
+@@ -1148,6 +1157,7 @@
+ 		found_valid_tld = FALSE;
+ 		found_non_ip = FALSE;
+ 
++		prev_type = PARM_CIDR;
+ 		for( d = data; d < data_end; d = SPF_data_next( d ) )
+ 		{
+ 			switch( d->dv.parm_type )
+@@ -1163,7 +1173,9 @@
+ 				break;
+ 
+ 			case PARM_STRING:
+-				found_valid_tld = FALSE;
++				/* a long literal continues in the next string block */
++				if (prev_type != PARM_STRING)
++					found_valid_tld = FALSE;
+ 
+ 				s = SPF_data_str( d );
+ 				s_end = s + d->ds.len;
+@@ -1184,6 +1196,7 @@
+ 			
+ 				break;
+ 			}
++			prev_type = d->dv.parm_type;
+ 		}
+ 
+ 		if ( !found_valid_tld || !found_non_ip ) {
+@@ -1571,30 +1584,27 @@
+ 								SPF_macro_t **spf_macrop,
+ 								const char *record)
+ {
+-ALIGN_DECL(
+-	char			 buf[sizeof(SPF_macro_t) + SPF_MAX_MOD_LEN];
+-);
+-	SPF_macro_t		*spf_macro = (SPF_macro_t *)ALIGNED_DECL(buf);
++	SPF_macro_t		*spf_macro;
+ 	SPF_data_t		*data;
+ 	SPF_errcode_t	 err;
+-	size_t			 size;
+-	
++	size_t			 src_len = strlen(record);
++	size_t			 data_avail = SPF_MACRO_DATA_MAX(src_len);
++
++	spf_macro = (SPF_macro_t *)malloc(sizeof(SPF_macro_t) + data_avail);
++	if (!spf_macro)
++		return SPF_E_NO_MEMORY;
+ 	data = SPF_macro_data(spf_macro);
+ 	spf_macro->macro_len = 0;
+ 
+ 	err = SPF_c_parse_macro(spf_server, spf_response,
+-					data, &spf_macro->macro_len, SPF_MAX_MOD_LEN,
+-					record, strlen(record),
++					data, &spf_macro->macro_len, data_avail,
++					record, src_len,
+ 					SPF_E_BIG_MOD, TRUE);
+-	if (err != SPF_E_SUCCESS)
++	if (err != SPF_E_SUCCESS) {
++		free(spf_macro);
+ 		return err;
+-
+-	/* XXX TODO: Tidy this up? */
+-	size = sizeof(SPF_macro_t) + spf_macro->macro_len;
+-	*spf_macrop = (SPF_macro_t *)malloc(size);
+-	if (!*spf_macrop)
+-		return SPF_E_NO_MEMORY;
+-	memcpy(*spf_macrop, ALIGNED_DECL(buf), size);
++	}
++	*spf_macrop = spf_macro;
+ 
+ 	return SPF_E_SUCCESS;
+ }
+--- a/src/libspf2/spf_id2str.c
++++ b/src/libspf2/spf_id2str.c
+@@ -95,7 +95,8 @@
+ 				else if (*s == '%') {
+ 					*p++ = '%';
+ 					s++;
+-					if (s[0] == '2' && s[1] == '0') {
++					/* only within this literal */
++					if (s_end - s >= 2 && s[0] == '2' && s[1] == '0') {
+ 						*p++ = '-';
+ 						s += 2;
+ 					}

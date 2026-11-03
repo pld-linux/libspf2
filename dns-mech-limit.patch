@@ -1,0 +1,56 @@
+RFC 7208 4.6.4: at most 10 mechanisms and modifiers that do DNS lookups
+per SPF check. Each include started its own count from zero, so a record
+with 10 includes of a record with 10 includes, nested up to the depth
+limit of 20, made 10^20 lookups; one sender could stall the receiving
+MTA. The count now goes through includes, and the term over the limit
+is a permerror before its lookup rather than after it.
+
+--- a/src/libspf2/spf_interpret.c
++++ b/src/libspf2/spf_interpret.c
+@@ -718,7 +718,14 @@
+ 	 * evaluate the mechanisms
+ 	 */
+ 
+-#define SPF_ADD_DNS_MECH() do { spf_response->num_dns_mech++; } while(0)
++/* RFC 7208 4.6.4: at most max_dns_mech DNS terms per check, includes
++ * counted in; one more is a permerror before its lookup. */
++#define SPF_ADD_DNS_MECH() do { \
++		if (++spf_response->num_dns_mech > spf_server->max_dns_mech) { \
++			SPF_FREE_LOOKUP_DATA(); \
++			return DONE(SPF_RESULT_PERMERROR, SPF_REASON_NONE, SPF_E_BIG_DNS); \
++		} \
++	} while(0)
+ 
+ #define SPF_MAYBE_SKIP_CIDR() \
+ 	do { \
+@@ -755,13 +762,6 @@
+ 	mech = spf_record->mech_first;
+ 	for (m = 0; m < spf_record->num_mech; m++) {
+ 
+-		/* This is as good a place as any. */
+-		/* XXX Rip this out and put it into a macro which can go into inner loops. */
+-		if (spf_response->num_dns_mech > spf_server->max_dns_mech) {
+-			SPF_FREE_LOOKUP_DATA();
+-			return DONE(SPF_RESULT_PERMERROR, SPF_REASON_NONE, SPF_E_BIG_DNS);
+-		}
+-
+ 		data = SPF_mech_data(mech);
+ 		data_end = SPF_mech_end_data(mech);
+ 
+@@ -1120,6 +1120,8 @@
+ 				}
+ 				spf_response->spf_record_exp = spf_record;
+ 				SPF_ASSERT_NOTNULL(spf_response->spf_record_exp);
++				/* the limit is per check, not per included record */
++				spf_response->num_dns_mech = save_spf_response->num_dns_mech;
+ 			}
+ 			/*
+ 			 * find out whether this configuration passes
+@@ -1150,6 +1152,7 @@
+ 				spf_response_subr = spf_response;
+ 				spf_response = save_spf_response;
+ 				save_spf_response = NULL;
++				spf_response->num_dns_mech = spf_response_subr->num_dns_mech;
+ 
+ 				/* Rewrite according to prefix of include */
+ 				switch (SPF_response_result(spf_response_subr)) {

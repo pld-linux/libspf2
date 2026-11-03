@@ -1,26 +1,54 @@
 # TODO
 # ./configure[3000]: AX_WITH_PERL: not found - needed after regeneration
+#
+# Conditional build:
+%bcond_without	tests	# PLD regression and upstream parser tests
 
 Summary:	Implementation of the SPF specification
 Summary(pl.UTF-8):	Implementacja specyfikacji SPF
 Name:		libspf2
 Version:	1.2.11
-Release:	3
+Release:	4
 License:	LGPL
 Group:		Libraries
 # Source0:	http://www.libspf2.org/spf/%{name}-%{version}.tar.gz
 Source0:	https://github.com/shevek/libspf2/tarball/4915c30#/%{name}.tar.gz
 # Source0-md5:	ad5f1b48e4f2b5561df99ca7cbf30e92
+Source1:	%{name}-tests.c
 Patch0:		%{name}-link.patch
 Patch1:		0001-remove-libreplace-unneeded-on-Linux.patch
-# https://github.com/shevek/libspf2/pull/44
+# CVE-2023-42118; https://github.com/shevek/libspf2/pull/44
 Patch2:         integer-underflow.patch
 Patch3:         spf_dns-include-std-headers.patch
 Patch4:         abolish-spf-rrtype.patch
-URL:		http://www.libspf2.org/
+Patch5:		record-mech-len.patch
+# https://bugs.debian.org/1065792
+Patch6:		fix-include.patch
+# https://github.com/shevek/libspf2/pull/10
+Patch7:		redirect-last.patch
+Patch8:		macro-truncate.patch
+# https://github.com/shevek/libspf2/pull/25
+Patch9:		dns-resolv-num-rr.patch
+# https://github.com/shevek/libspf2/pull/15
+Patch10:	query-record-uaf.patch
+# https://github.com/shevek/libspf2/pull/37
+Patch11:	dns-cache-precedence.patch
+Patch12:	rfc-error-results.patch
+Patch13:	duplicate-exp.patch
+Patch14:	long-values.patch
+Patch15:	domain-truncate.patch
+Patch16:	empty-domain-spec.patch
+Patch17:	dns-mech-limit.patch
+Patch18:	malformed-domain.patch
+URL:		https://github.com/shevek/libspf2
 BuildRequires:	autoconf >= 2.59
 BuildRequires:	automake
 BuildRequires:	libtool
+%if %{with tests}
+BuildRequires:	perl(Test::More)
+BuildRequires:	perl(Text::ParseWords)
+BuildRequires:	perl-base
+%endif
 Obsoletes:	libspf_alt
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
@@ -81,6 +109,20 @@ Statyczna biblioteka libspf2.
 %patch -P2 -p1
 %patch -P3 -p1
 %patch -P4 -p1
+%patch -P5 -p1
+%patch -P6 -p1
+%patch -P7 -p1
+%patch -P8 -p1
+%patch -P9 -p1
+%patch -P10 -p1
+%patch -P11 -p1
+%patch -P12 -p1
+%patch -P13 -p1
+%patch -P14 -p1
+%patch -P15 -p1
+%patch -P16 -p1
+%patch -P17 -p1
+%patch -P18 -p1
 
 %build
 %{__libtoolize}
@@ -90,6 +132,15 @@ Statyczna biblioteka libspf2.
 %{__automake}
 %configure
 %{__make}
+
+%if %{with tests}
+%{__cc} %{rpmcflags} %{rpmcppflags} %{rpmldflags} -Isrc/include -I. \
+	-o libspf2-tests %{SOURCE1} src/libspf2/.libs/libspf2.a -lresolv -lpthread
+./libspf2-tests
+# other upstream suites fail without PLD patches too; test_live needs network
+cd tests
+./run_single_parser
+%endif
 
 %install
 rm -rf $RPM_BUILD_ROOT

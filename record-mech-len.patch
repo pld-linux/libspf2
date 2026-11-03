@@ -1,0 +1,97 @@
+SPF_MAX_MECH_LEN/SPF_MAX_MOD_LEN (511) were checked against the whole
+compiled record, so mechanisms past ~511 bytes (64 ip4) were silently
+dropped, -all included, and compilation reported no error. Mechanisms
+past the new limits are a permerror; modifiers past them are skipped
+with a warning, as RFC 7208 6 requires unknown ones to be ignored.
+https://github.com/shevek/libspf2/issues/21
+https://github.com/shevek/libspf2/issues/48
+https://github.com/shevek/libspf2/issues/60
+
+--- a/src/libspf2/spf_compile.c
++++ b/src/libspf2/spf_compile.c
+@@ -61,6 +61,16 @@
+  */
+ #define SPF_RECORD_BUFSIZ	  4096
+ 
++/**
++ * Limits on a whole compiled record. SPF_MAX_MECH_LEN and
++ * SPF_MAX_MOD_LEN bound a single mechanism or modifier only.
++ */
++#define SPF_MAX_RECORD_MECH_LEN	16384
++#define SPF_MAX_RECORD_MOD_LEN	16384
++/* SPF_record_t.num_mech and num_mod are unsigned char. */
++#define SPF_MAX_NUM_MECH		255
++#define SPF_MAX_NUM_MOD			255
++
+ #define ALIGN_DECL(decl) union { double d; long l; decl } __attribute__((aligned(_ALIGN_SZ))) u
+ #define ALIGNED_DECL(var) u.var
+ 
+@@ -856,9 +866,6 @@
+ 
+ 	len = sizeof( SPF_mech_t );
+ 
+-	if ( spf_record->mech_len + len > SPF_MAX_MECH_LEN )
+-		return SPF_E_BIG_MECH;
+-
+ 	data = SPF_mech_data(spf_mechanism);
+ 	data_len = 0;
+ 
+@@ -960,6 +967,16 @@
+ 
+ 	/* Copy the thing in. */
+ 	if (err == SPF_E_SUCCESS) {
++		if (spf_record->num_mech >= SPF_MAX_NUM_MECH)
++			return SPF_response_add_error_ptr(spf_response,
++							SPF_E_BIG_MECH, NULL, *mech_value,
++							"Too many mechanisms (%d max)",
++							SPF_MAX_NUM_MECH);
++		if (spf_record->mech_len + len > SPF_MAX_RECORD_MECH_LEN)
++			return SPF_response_add_error_ptr(spf_response,
++							SPF_E_BIG_MECH, NULL, *mech_value,
++							"Mechanisms too long (%d bytes max)",
++							SPF_MAX_RECORD_MECH_LEN);
+ 		if (mechtype->is_dns_mech)
+ 			spf_record->num_dns_mech++;
+ 		if (SPF_c_ensure_capacity((void **)&spf_record->mech_first,
+@@ -1008,8 +1025,13 @@
+ 	memset(u.buf, 'A', sizeof(u.buf));
+ 	memset(spf_modifier, 0, sizeof(SPF_mod_t));
+ 
++	/* Stored modifiers never change the result (redirect= is compiled
++	 * as a mechanism), so one that does not fit is skipped, not an error. */
+ 	if ( name_len > SPF_MAX_MOD_LEN )
+-		return SPF_E_BIG_MOD;
++		return SPF_response_add_warn_ptr(spf_response,
++						SPF_E_BIG_MOD, NULL, mod_name,
++						"Modifier name too long (%d chars max), ignored",
++						SPF_MAX_MOD_LEN);
+ 
+ 	spf_modifier->name_len = name_len;
+ 	spf_modifier->data_len = 0;
+@@ -1017,9 +1039,6 @@
+ 	/* So that spf_modifier + len == SPF_mod_data(spf_modifier) */
+ 	len = _align_sz(sizeof( SPF_mod_t ) + name_len);
+ 
+-	if ( spf_record->mod_len + len > SPF_MAX_MOD_LEN )
+-		return SPF_E_BIG_MOD;
+-
+ 	memcpy(SPF_mod_name(spf_modifier), mod_name, name_len);
+ 
+ 	data = SPF_mod_data(spf_modifier);
+@@ -1038,6 +1057,16 @@
+ 
+ 	/* Copy the thing in. */
+ 	if (err == SPF_E_SUCCESS) {
++		if (spf_record->num_mod >= SPF_MAX_NUM_MOD)
++			return SPF_response_add_warn_ptr(spf_response,
++							SPF_E_BIG_MOD, NULL, mod_name,
++							"Too many modifiers (%d max), ignored",
++							SPF_MAX_NUM_MOD);
++		if (spf_record->mod_len + len > SPF_MAX_RECORD_MOD_LEN)
++			return SPF_response_add_warn_ptr(spf_response,
++							SPF_E_BIG_MOD, NULL, mod_name,
++							"Modifiers too long (%d bytes max), ignored",
++							SPF_MAX_RECORD_MOD_LEN);
+ 		if (SPF_c_ensure_capacity((void **)&spf_record->mod_first,
+ 							&spf_record->mod_size,
+ 							spf_record->mod_len + len) < 0)

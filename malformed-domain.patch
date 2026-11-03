@@ -1,0 +1,50 @@
+RFC 7208 4.3: check_host() returns none for a malformed domain (an empty
+label, a label over 63 chars) without a lookup. libspf2 queried it, the
+resolver failed with NO_RECOVERY, and the sender got temperror, deferring
+mail that can never pass; an include of such a domain is now a permerror.
+
+--- a/src/libspf2/spf_server.c
++++ b/src/libspf2/spf_server.c
+@@ -312,6 +312,28 @@
+ 	return err;
+ }
+ 
++/* RFC 7208 4.3: an empty label not at the end, a label over 63 chars or
++ * a name over 253 chars; the resolver would fail it as a DNS error */
++static int
++SPF_domain_malformed(const char *domain)
++{
++	const char	*p, *dot;
++	size_t		 len = strlen(domain);
++
++	if (len > 0 && domain[len - 1] == '.')
++		len--;
++	if (len > 253)
++		return 1;
++	for (p = domain; p < domain + len; p = dot + 1) {
++		dot = memchr(p, '.', domain + len - p);
++		if (dot == NULL)
++			dot = domain + len;
++		if (dot == p || dot - p > 63)
++			return 1;
++	}
++	return 0;
++}
++
+ SPF_errcode_t
+ SPF_server_get_record(SPF_server_t *spf_server,
+ 				SPF_request_t *spf_request,
+@@ -339,6 +361,13 @@
+ 
+ 	*spf_recordp = NULL;
+ 
++	if (SPF_domain_malformed(domain)) {
++		spf_response->result = SPF_RESULT_NONE;
++		spf_response->reason = SPF_REASON_FAILURE;
++		return SPF_response_add_error(spf_response, SPF_E_NOT_SPF,
++				"Malformed domain name '%s'.", domain);
++	}
++
+ 	resolver = spf_server->resolver;
+ 
+ 	if (resolver->get_spf)

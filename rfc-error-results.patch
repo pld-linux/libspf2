@@ -1,0 +1,71 @@
+RFC 7208 results for errors in the checked domain's own record lookup.
+
+A record that does not compile (syntax error, too many mechanisms)
+must give permerror (RFC 7208 4.6); libspf2 left the result unset,
+so SPF_response_result() returned SPF_RESULT_INVALID, the response
+error code stayed SPF_E_SUCCESS and Received-SPF said "(invalid)".
+Applies to SPF_request_query_mailfrom(), _fallback() and _rcptto();
+the same record behind include:/redirect= already gave permerror.
+The response now also carries the compile error code.
+
+DNS errors other than NXDOMAIN must give temperror (RFC 7208 4.4):
+NO_RECOVERY gave permerror and unknown h_errno values gave
+"(invalid)"; behind include:/redirect= both already gave temperror.
+A successful lookup with no TXT records is none (RFC 7208 4.5).
+
+--- a/src/libspf2/spf_request.c
++++ b/src/libspf2/spf_request.c
+@@ -246,7 +246,14 @@
+ 	if (err != SPF_E_SUCCESS) {
+ 		if (spf_record)
+ 			SPF_record_free(spf_record);
+-		SPF_i_done(spf_response, spf_response->result, spf_response->reason, spf_response->err);
++		/* Lookup failures set their own result; an unset one means
++		 * the record did not compile (RFC 7208 4.6: permerror). */
++		if (spf_response->result == SPF_RESULT_INVALID) {
++			spf_response->result = err == SPF_E_NO_MEMORY
++					? SPF_RESULT_TEMPERROR : SPF_RESULT_PERMERROR;
++			spf_response->reason = SPF_REASON_FAILURE;
++		}
++		SPF_i_done(spf_response, spf_response->result, spf_response->reason, err);
+ 		return err;
+ 	}
+ 	/* Now, in theory, SPF_response_errors(spf_response) == 0 */
+--- a/src/libspf2/spf_server.c
++++ b/src/libspf2/spf_server.c
+@@ -401,7 +401,7 @@
+ 				rr_type = ns_t_txt;
+ 				goto retry;
+ 			}
+-			spf_response->result = SPF_RESULT_PERMERROR;
++			spf_response->result = SPF_RESULT_TEMPERROR;
+ 			spf_response->reason = SPF_REASON_FAILURE;
+ 			return SPF_response_add_error(spf_response, SPF_E_DNS_ERROR,
+ 					"Unrecoverable DNS failure for '%s'.", domain);
+@@ -421,6 +421,8 @@
+ 				rr_type = ns_t_txt;
+ 				goto retry;
+ 			}
++			spf_response->result = SPF_RESULT_TEMPERROR;
++			spf_response->reason = SPF_REASON_FAILURE;
+ 			return SPF_response_add_error(spf_response, SPF_E_DNS_ERROR,
+ 					"Unknown DNS failure for '%s': %d.",
+ 					domain, herrno);
+@@ -433,6 +435,8 @@
+ 			rr_type = ns_t_txt;
+ 			goto retry;
+ 		}
++		spf_response->result = SPF_RESULT_NONE;
++		spf_response->reason = SPF_REASON_FAILURE;
+ 		return SPF_response_add_error(spf_response, SPF_E_NOT_SPF,
+ 				"No TXT records returned from DNS lookup for '%s'",
+ 				domain);
+@@ -490,7 +494,7 @@
+ 
+ 	/* FIXME: support multiple versions */
+ 	if (err != SPF_E_SUCCESS)
+-		return SPF_response_add_error(spf_response, SPF_E_NOT_SPF,
++		return SPF_response_add_error(spf_response, err,
+ 				"Failed to compile SPF record for '%s'", domain);
+ 
+ 	return SPF_E_SUCCESS;
